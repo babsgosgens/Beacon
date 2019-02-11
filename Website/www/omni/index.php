@@ -55,14 +55,23 @@ table.generic .bullet-column {
 <?php
 BeaconTemplate::FinishStyles();
 
+$session = BeaconSession::GetFromCookie();
+if (!is_null($session)) {
+	$user = BeaconUser::GetByUserID($session->UserID());
+} else {
+	$user = null;
+}
+
 ?>
 <h1>Do more with Beacon Omni</h1>
 <p>Beacon does a lot for free. Loot drops, server control, file sharing, and more. But when it's time to get into more advanced configuration like crafting costs and player experience, then it's time to upgrade to Beacon Omni.</p>
 <p>All users of Beacon can use all features, however Omni-only config types will not be included in generated Game.ini and GameUserSettings.ini files.</p>
 <?php if (BeaconUser::OmniFree) { ?>
 <p class="text-center inset-note"><strong>Beacon Omni is currently in beta testing. While testing, Omni features are available to all users. Instructions for activating Omni are available in <a href="/account/#omni">your account control panel</a>. Free beta Omni licenses will expire in the future.</strong></p>
+<?php } elseif (is_null($user) == false && $user->OmniVersion() >= 1) { ?>
+<p class="text-center inset-note">You have already purchased Beacon Omni! See <a href="/account/#omni">your account control panel</a> for instructions on activating Beacon Omni on your computer.</p>
 <?php } else { ?>
-<p class="text-center"><button id="buy-button" class="default">Buy Omni</button></p>
+<p class="text-center"><button id="buy-button" class="default">Buy Omni</button><br><span class="smaller">Already purchased? See <a href="/account/#omni">your account control panel</a> for more details.</span></p>
 <?php } ?>
 <table class="generic">
 	<thead>
@@ -105,6 +114,11 @@ BeaconTemplate::FinishStyles();
 		</tr>
 		<tr>
 			<td>Player &amp; Tame Experience<br><span class="smaller text-lighter">Control max level and the experience curve for both players and tamed dinos.</span></td>
+			<td class="text-center bullet-column">&nbsp;</td>
+			<td class="text-center bullet-column">&#10687;</td>
+		</tr>
+		<tr>
+			<td>Stack Sizes (Experimental)<br><span class="smaller text-lighter">Ark finally allows admins to customize stack sizes, so Beacon Omni has an editor ready to go.</span></td>
 			<td class="text-center bullet-column">&nbsp;</td>
 			<td class="text-center bullet-column">&#10687;</td>
 		</tr>
