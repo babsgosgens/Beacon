@@ -7,6 +7,7 @@ class BeaconObject implements JsonSerializable {
 	private $min_version;
 	private $mod_id;
 	private $mod_name;
+	private $tags = array();
 	
 	public function __construct($object_id = null) {
 		if ($object_id === null) {
@@ -21,6 +22,7 @@ class BeaconObject implements JsonSerializable {
 			'object_id',
 			'label',
 			'min_version',
+			'tags',
 			'mods.mod_id',
 			'mods.name AS mod_name'
 		);
@@ -58,6 +60,8 @@ class BeaconObject implements JsonSerializable {
 			return $this->min_version;
 		case 'mod_id':
 			return $this->mod_id;
+		case 'tags':
+			return '{' . implode(',', $this->tags) . '}';
 		default:
 			return null;
 		}
@@ -230,12 +234,21 @@ class BeaconObject implements JsonSerializable {
 	}
 	
 	protected static function FromRow(BeaconRecordSet $row) {
+		$tags = substr($row->Field('tags'), 1, -1);
+		if (strlen($tags) > 0) {
+			$tags = explode(',', $tags);
+		} else {
+			$tags = array();
+		}
+		asort($tags);
+		
 		$obj = new static($row->Field('object_id'));
 		$obj->object_group = $row->Field('table_name');
 		$obj->label = $row->Field('label');
 		$obj->min_version = intval($row->Field('min_version'));
 		$obj->mod_id = $row->Field('mod_id');
 		$obj->mod_name = $row->Field('mod_name');
+		$obj->tags = array_values($tags);
 		return $obj;
 	}
 	
@@ -297,7 +310,8 @@ class BeaconObject implements JsonSerializable {
 				'id' => $this->mod_id,
 				'name' => $this->mod_name
 			),
-			'group' => $this->object_group
+			'group' => $this->object_group,
+			'tags' => $this->tags
 		);
 	}
 	
@@ -334,6 +348,36 @@ class BeaconObject implements JsonSerializable {
 		$database->BeginTransaction();
 		$database->Query('DELETE FROM ' . static::TableName() . ' WHERE object_id = $1;', $this->object_id);
 		$database->Commit();
+	}
+	
+	private static function NormalizeTag(string $tag) {
+		$tag = strtolower($tag);
+		$tag = preg_replace('/[^\w]/', '', $tag);
+		return $tag;
+	}
+	
+	public function Tags() {
+		return $this->tags;
+	}
+	
+	public function AddTag(string $tag) {
+		$tag = self::NormalizeTag($tag);
+		if (!in_array($tag, $this->tags)) {
+			$this->tags[] = $tag;
+		}
+	}
+	
+	public function RemoveTag(string $tag) {
+		$tag = self::NormalizeTag($tag);
+		if (in_array($tag, $this->tags)) {
+			$arr = array();
+			foreach ($this->tags as $current_tag) {
+				if ($current_tag !== $tag) {
+					$arr[] = $current_tag;
+				}
+			}
+			$this->tags = $arr;
+		}
 	}
 }
 

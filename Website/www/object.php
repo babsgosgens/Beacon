@@ -25,6 +25,14 @@ BeaconTemplate::SetTitle($obj->Label());
 $properties = array(
 	'Mod' => '[' . $obj->ModName() . '](/mods/info.php?mod_id=' . urlencode($obj->ModID()) . ')'
 );
+$tags = $obj->Tags();
+if (count($tags) > 0) {
+	$links = array();
+	foreach ($tags as $tag) {
+		$links[] = '[' . ucwords($tag) . '](/tags/' . urlencode($tag) . ')';
+	}
+	$properties['Tags'] = implode(', ', $links);
+}
 
 if ($obj instanceof BeaconBlueprint) {
 	PrepareBlueprintTable($obj, $properties);
