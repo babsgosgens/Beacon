@@ -29,7 +29,8 @@ CREATE DOMAIN hex AS citext CHECK (value ~ '^[a-fA-F0-9]+$');
 CREATE TABLE email_addresses (
 	email_id UUID NOT NULL PRIMARY KEY DEFAULT gen_random_uuid(),
 	address TEXT NOT NULL,
-	group_key hex NOT NULL
+	group_key hex NOT NULL,
+	group_key_precision INTEGER NOT NULL
 );
 GRANT SELECT, INSERT ON TABLE email_addresses TO thezaz_website;
 
@@ -39,7 +40,7 @@ CREATE TABLE email_verification (
 );
 GRANT SELECT, INSERT, UPDATE, DELETE ON email_verification TO thezaz_website;
 
-CREATE OR REPLACE FUNCTION group_key_for_email(p_address email) RETURNS hex AS $$
+CREATE OR REPLACE FUNCTION group_key_for_email(p_address email, p_precision INTEGER) RETURNS hex AS $$
 DECLARE
 	v_user TEXT;
 	v_domain TEXT;
@@ -48,10 +49,10 @@ BEGIN
 	v_user := SUBSTRING(p_address, '^([^@]+)@.+$');
 	v_domain := SUBSTRING(p_address, '^[^@]+@(.+)$');
 	
-	IF LENGTH(v_user) <= 2 THEN
+	IF LENGTH(v_user) <= p_precision THEN
 		v_kvalue := '@' || v_domain;
 	ELSE
-		v_kvalue := SUBSTRING(v_user, 1, 2) || '*@' || v_domain;
+		v_kvalue := SUBSTRING(v_user, 1, p_precision) || '*@' || v_domain;
 	END IF;
 	
 	RETURN MD5(LOWER(v_kvalue));
@@ -62,7 +63,7 @@ CREATE OR REPLACE FUNCTION uuid_for_email(p_address email) RETURNS UUID AS $$
 DECLARE
 	v_uuid UUID;
 BEGIN
-	SELECT email_id INTO v_uuid FROM email_addresses WHERE group_key = group_key_for_email(p_address) AND CRYPT(LOWER(p_address), address) = address;
+	SELECT email_id INTO v_uuid FROM email_addresses WHERE group_key = group_key_for_email(p_address, email_addresses.group_key_precision) AND CRYPT(LOWER(p_address), address) = address;
 	IF FOUND THEN
 		RETURN v_uuid;
 	ELSE
@@ -74,10 +75,19 @@ $$ LANGUAGE 'plpgsql' STABLE;
 CREATE OR REPLACE FUNCTION uuid_for_email(p_address email, p_create BOOLEAN) RETURNS UUID AS $$
 DECLARE
 	v_uuid UUID;
+	v_precision INTEGER;
+	k_target_precision CONSTANT INTEGER := 5;
 BEGIN
 	v_uuid := uuid_for_email(p_address);
-	IF v_uuid IS NULL AND p_create = TRUE THEN
-		INSERT INTO email_addresses (address, group_key) VALUES (CRYPT(LOWER(p_address), GEN_SALT('bf')), group_key_for_email(p_address)) RETURNING email_id INTO v_uuid;
+	IF v_uuid IS NULL THEN
+		IF p_create = TRUE THEN
+			INSERT INTO email_addresses (address, group_key, group_key_precision) VALUES (CRYPT(LOWER(p_address), GEN_SALT('bf')), group_key_for_email(p_address, k_target_precision), k_target_precision) RETURNING email_id INTO v_uuid;
+		END IF;
+	ELSE
+		SELECT group_key_precision INTO v_precision FROM email_addresses WHERE email_id = v_uuid;
+		IF v_precision != k_target_precision THEN
+			UPDATE email_addresses SET group_key = group_key_for_email(p_address, k_target_precision), group_key_precision = k_target_precision WHERE email_id = v_uuid;
+		END IF;
 	END IF;
 	RETURN v_uuid;	
 END;
