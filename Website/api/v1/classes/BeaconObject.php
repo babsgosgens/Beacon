@@ -167,6 +167,13 @@ class BeaconObject implements JsonSerializable {
 				return $numeric_value;
 			}
 		}
+		if (is_string($value)) {
+			if (strpos($value, ':') !== false) {
+				list($column, $value) = explode(':', $value, 2);
+				$possible_columns[] = $column;
+				return $value;
+			}
+		}
 		
 		return null;
 	}
@@ -194,8 +201,16 @@ class BeaconObject implements JsonSerializable {
 		
 		$c = 3;
 		foreach ($values as $column => $list) {
-			$clauses[] = $column . ' = ANY($' . $c++ . ')';
-			$parameters[] = $list;
+			if ($column == 'tags') {
+				$tags = explode(',', substr($list, 1, -1));
+				foreach ($tags as $tag) {
+					$clauses[] = '$' . $c++ . ' = ANY(tags)';
+					$parameters[] = $tag;
+				}
+			} else {
+				$clauses[] = $column . ' = ANY($' . $c++ . ')';
+				$parameters[] = $list;
+			}
 		}
 		if (count($clauses) > 0) {
 			$clauses = array('(' . implode(' OR ', $clauses) . ')');
@@ -206,7 +221,8 @@ class BeaconObject implements JsonSerializable {
 		}
 		
 		$database = BeaconCommon::Database();
-		$results = $database->Query(static::BuildSQL($clauses), $parameters);
+		$sql = static::BuildSQL($clauses);
+		$results = $database->Query($sql, $parameters);
 		return static::FromResults($results);
 	}
 	
@@ -215,6 +231,11 @@ class BeaconObject implements JsonSerializable {
 		if (count($objects) == 1) {
 			return $objects[0];
 		}
+	}
+	
+	public static function GetWithTag(string $tag, int $min_version = 0, DateTime $updated_since = null) {
+		$tag = self::NormalizeTag($tag);
+		return static::Get('tags:' . $tag, $min_version, $updated_since);
 	}
 	
 	protected static function FromResults(BeaconRecordSet $results) {

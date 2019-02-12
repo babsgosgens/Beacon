@@ -1,6 +1,6 @@
 <?php
 
-require(dirname(__FILE__, 2) . '/framework/loader.php');
+require(dirname(__FILE__, 3) . '/framework/loader.php');
 
 if (!isset($_GET['id'])) {
 	http_response_code(400);
@@ -23,7 +23,7 @@ if ($obj instanceof BeaconBlueprint && $_GET['id'] != $obj->ClassString()) {
 BeaconTemplate::SetTitle($obj->Label());
 
 $properties = array(
-	'Mod' => '[' . $obj->ModName() . '](/mods/info.php?mod_id=' . urlencode($obj->ModID()) . ')'
+	'Mod' => '[' . $obj->ModName() . '](/mods/' . urlencode($obj->ModID()) . ')'
 );
 $tags = $obj->Tags();
 if (count($tags) > 0) {
